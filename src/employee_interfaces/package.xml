@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>resident_recognition</name>
+  <version>0.1.0</version>
+  <description>Resident Recognition Robot with LiDAR and Camera Integration</description>
+
+  <maintainer email="kdyug314@gmail.com">Your Name</maintainer>
+  <license>Apache 2.0</license>
+
+  <!-- 빌드 및 실행 종속성 -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+
+  <!-- 메시지 및 서비스 관련 -->
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+
+  <!-- OpenCV 및 ROS-OpenCV 변환 -->
+  <exec_depend>opencv</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+
+  <!-- ROS 2 Python -->
+  <exec_depend>rclpy</exec_depend>
+
+  <!-- Gazebo 및 로봇 상태 -->
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <!-- 빌드 타입 -->
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+
