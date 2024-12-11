@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import time
 from math import sin, cos, pi
+from matplotlib import pyplot as plt
 
 import rclpy
 from rclpy.node import Node
@@ -14,7 +15,6 @@ from sensor_msgs.msg import Image, LaserScan
 from cv_bridge import CvBridge
 from std_srvs.srv import Trigger
 from std_msgs.msg import Bool
-import dlib
 
 class ResidentRecognitionRobot(Node):
     def __init__(self, robot_name):
@@ -33,7 +33,7 @@ class ResidentRecognitionRobot(Node):
             Image,
             f'/{self.robot_name}/camera/image_raw',
             self.camera_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
         )
 
         # 라이다 데이터 구독
@@ -41,7 +41,7 @@ class ResidentRecognitionRobot(Node):
             LaserScan,
             f'/{self.robot_name}/scan',
             self.lidar_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
         )
 
         # 관제탑 호출 서비스 클라이언트
@@ -65,20 +65,6 @@ class ResidentRecognitionRobot(Node):
             'Jane Doe': 'face_data_2.npy'
         }
         self.bridge = CvBridge()
-
-        # 얼굴 탐지 및 인코딩 모델 초기화
-        self.detector = dlib.get_frontal_face_detector()
-        self.predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-        self.face_rec_model = dlib.face_recognition_model_v1("dlib_face_recognition_resnet_model_v1.dat")
-
-        # 주민 얼굴 인코딩 데이터 로드
-        self.known_face_encodings = []
-        self.known_face_names = []
-
-        for name, file in self.resident_database.items():
-            face_encoding = np.load(file)
-            self.known_face_encodings.append(face_encoding)
-            self.known_face_names.append(name)
 
         # 순찰 경로 설정
         self.patrol_points = [
@@ -131,53 +117,36 @@ class ResidentRecognitionRobot(Node):
         self.vel_pub.publish(twist)
 
     def detect_and_recognize_faces(self, frame):
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        face_locations = self.detect_faces(rgb_frame)
-        face_encodings = self.encode_faces(rgb_frame, face_locations)
+        # 주민 데이터베이스와 매칭을 위한 SIFT 기반 이미지 매칭 수행
+        for resident_name, resident_image_path in self.resident_database.items():
+            self.get_logger().info(f"{resident_name}에 대한 매칭을 시도합니다.")
+            match_result = self.SIFT_feature_matching(resident_image_path, frame)
+            if match_result:
+                self.get_logger().info(f"{resident_name} 매칭 성공!")
+                return
 
-        for face_encoding, face_location in zip(face_encodings, face_locations):
-            matches = self.compare_faces(self.known_face_encodings, face_encoding)
-            name = "Unknown"
+        self.get_logger().warn("알 수 없는 사람이 감지되었습니다.")
+        if not self.security_robot_called:
+            self.call_security_robot()
 
-            face_distances = self.face_distance(self.known_face_encodings, face_encoding)
-            best_match_index = np.argmin(face_distances)
-            if matches[best_match_index]:
-                name = self.known_face_names[best_match_index]
+    def SIFT_feature_matching(self, img1, img2, n=1000):
+        try:
+            t1 = cv2.imread(img1, 0)
+            t2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-            self.display_face(frame, face_location, name)
+            sift = cv2.SIFT_create()
 
-            if name != "Unknown":
-                self.get_logger().info(f"주민 확인: {name}. 환영합니다!")
-            else:
-                self.get_logger().warn("알 수 없는 사람을 감지했습니다.")
-                if not self.security_robot_called:
-                    self.call_security_robot()
+            kp1, des1 = sift.detectAndCompute(t1, None)
+            kp2, des2 = sift.detectAndCompute(t2, None)
 
-        cv2.imshow("Resident Recognition", frame)
-        cv2.waitKey(1)
+            bf = cv2.BFMatcher()
+            matches = bf.match(des1, des2)
 
-    def detect_faces(self, rgb_frame):
-        return self.detector(rgb_frame, 1)
-
-    def encode_faces(self, rgb_frame, face_locations):
-        encodings = []
-        for face in face_locations:
-            shape = self.predictor(rgb_frame, face)
-            encoding = np.array(self.face_rec_model.compute_face_descriptor(rgb_frame, shape))
-            encodings.append(encoding)
-        return encodings
-
-    def compare_faces(self, known_encodings, face_encoding, tolerance=0.6):
-        distances = self.face_distance(known_encodings, face_encoding)
-        return distances <= tolerance
-
-    def face_distance(self, known_encodings, face_encoding):
-        return np.linalg.norm(known_encodings - face_encoding, axis=1)
-
-    def display_face(self, frame, face_location, name):
-        top, right, bottom, left = face_location.top(), face_location.right(), face_location.bottom(), face_location.left()
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+            matches = sorted(matches, key=lambda x: x.distance)
+            return len(matches[:n]) > 10  # 매칭된 포인트가 10개 이상일 경우 성공으로 간주
+        except Exception as e:
+            self.get_logger().error(f"SIFT 매칭 중 오류 발생: {e}")
+            return False
 
     def call_security_robot(self):
         self.security_robot_called = True
