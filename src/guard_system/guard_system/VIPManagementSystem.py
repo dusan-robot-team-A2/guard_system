@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from ultralytics import YOLO
 
 class VIPManagementSystem:
     def __init__(self):

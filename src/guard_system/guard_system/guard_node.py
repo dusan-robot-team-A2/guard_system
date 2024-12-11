@@ -1,5 +1,5 @@
 import rclpy
-from rclpy.action import ActionClient
+from rclpy.action import ActionClient, ActionServer
 from rclpy.node import Node
 import rclpy.time
 import std_msgs.msg as msg
@@ -8,7 +8,6 @@ from sensor_msgs.msg import Image, CompressedImage
 from geometry_msgs.msg import Point, PoseStamped, Twist, Quaternion, Pose
 from nav2_msgs.srv import SetInitialPose
 from cv_bridge import CvBridge
-import numpy as np
 import cv2
 from nav2_msgs.action import NavigateToPose
 import math
@@ -38,18 +37,16 @@ class MoveToZoneActionServer(Node):
         self.set_initial_pose(*self.init_pose)
 
         # GUARD AMR_Image sub
-        self.AMR_image_subscriber = self.create_subscription(Image,'/tb3_0/camera/image_raw',10, self.image_callback)
+        self.AMR_image_subscriber = self.create_subscription(Image,'/robot1/camera/image_raw',10, self.image_callback)
         # SM_tracked_image_pub
-        self.sm_tracked_image_publisher = self.create_publisher(Image, 'tracked_image', 10)
+        self.sm_tracked_image_publisher = self.create_publisher(Image, '/tracked_image', 10)
         # patrol_AMR_pub
-        self.patrol_AMR_publisher = self.create_publisher(msg.String, 'patrol', 10)
+        self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
 
         # get_order_sub
-        self.get_order_subscriber = self.create_subscription(msg.String, 'get_order', 10, self.order_callback)
+        self.get_order_subscriber = ActionServer(msg.String, '/get_order', 10, self.order_callback)
         # AMR_navgoal_action_client
-        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/tb3_1/navigate_to_pose') 
-
-        self.img_timer = self.create_timer(0.1, self.image_callback)
+        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/robot2/navigate_to_pose') 
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -67,31 +64,43 @@ class MoveToZoneActionServer(Node):
         qw = math.cos(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
         return Quaternion(x=qx, y=qy, z=qz, w=qw)
     
-    def tf_timer_callback(self):
+    def set_initial_pose(self, x, y, z, w):
+        req = SetInitialPose.Request()
+        req.pose.header.frame_id = 'map'
+        req.pose.pose.pose.position = Point(x=x, y=y, z=0.0)
+        req.pose.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=z, w=w)
+        req.pose.pose.covariance = [
+            0.1, 0.0, 0.0, 0.0, 0.0, 0.1,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.1, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.01
+        ]
+
+        future = self.set_initial_pose_service_client.call_async(req)
+        future.add_done_callback(self.handle_initial_pose_response)
+
+    def handle_initial_pose_response(self, future):
         try:
-            # 첫 번째 로봇 ('tb3_0')의 'base_link'에서 'map' 좌표를 얻기
-            transform_tb3_0 = self.tf_buffer.lookup_transform('map', 'tb3_0/base_link', rclpy.time.Time())
-
-            # 첫 번째 로봇 (tb3_0) 좌표 출력
-            x_0 = transform_tb3_0.transform.translation.x
-            y_0 = transform_tb3_0.transform.translation.y
-            z_0 = transform_tb3_0.transform.translation.z
-            return x_0, y_0, z_0
-
-        except tf2_ros.LookupException as e:
-            self.get_logger().warn(f"좌표를 얻는 데 실패: {e}")
+            response = future.result()
+            if response:
+                self.initial_status = True
+            else:
+                self.get_logger().warn("[WARN] Failed to set initial pose")
+        except Exception as e:
+            self.get_logger().error(f"[ERROR] Service call failed: {e}")
 
     # 디지털 맵 내 지정 구역으로 이동
-    def order_callback(self, msg):
+    def order_callback(self, position):
         
-        if msg == '1':
-            x, y, z = self.tf_timer_callback()
+        if position:
             # 목표 좌표를 PoseStamped 메시지로 생성
             goal_msg = PoseStamped()
             goal_msg.header.frame_id = 'map'  # SLAM에서 사용되는 좌표계 (보통 'map' 프레임)
             goal_msg.header.stamp = self.get_clock().now().to_msg()
-            goal_msg.pose.position.x = x
-            goal_msg.pose.position.y = y
+            goal_msg.pose.position.x = position.position.x
+            goal_msg.pose.position.y = position.position.y
             goal_msg.pose.orientation = 1.0  # 회전 값 (회전 없음)
 
             if not self.amr_navgoal_client.wait_for_server(timeout_sec=1.0):
@@ -133,28 +142,16 @@ class MoveToZoneActionServer(Node):
             #     move_cmd.linear.x = 0.0
             #     move_cmd.angular.z = 0.0
             #     self.amr_cmd_vel_pub.publish(move_cmd)
-        else:
-            # 목표 좌표를 PoseStamped 메시지로 생성
-            goal_msg = PoseStamped()
-            goal_msg.header.frame_id = 'map'  # SLAM에서 사용되는 좌표계 (보통 'map' 프레임)
-            goal_msg.header.stamp = self.get_clock().now().to_msg()
-            goal_msg.pose.position.x = self.home_pos.position.x
-            goal_msg.pose.position.y = self.home_pos.position.y
-            goal_msg.pose.orientation = self.home_pos.orientation  # 회전 값 (회전 없음)
-
+        
             if not self.amr_navgoal_client.wait_for_server(timeout_sec=1.0):
                 self.get_logger().info('Action server not available')
                 return
-            
-
-            # 현재 amr 에 입력되어 있는 명령을 무시하도록 하는 코드 필요
-
-            goal_pos = NavigateToPose.Goal()
-            goal_pos.pose = goal_msg
-            self.amr_navgoal_client.send_goal_async(goal_pos, feedback_callback=self.feedback_callback)
     
     def goal_response_callback(self, future):
         result = future.result()
+        massage = msg.String()
+        massage.data = 'found target'
+        self.patrol_AMR_publisher.publish(massage)
 
         if result.status == GoalStatus.STATUS_SUCCEEDED:
             self.vip.search_vip(self.image)
@@ -169,6 +166,7 @@ class MoveToZoneActionServer(Node):
         return bridge.imgmsg_to_cv2(ros_image, encoding='bgr8')
 
     def image_callback(self, image):
+        image = self.convert_ros_to_cv2_image(image)
         self.image = image
         
 
