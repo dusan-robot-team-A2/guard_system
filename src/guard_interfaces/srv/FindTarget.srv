@@ -1,0 +1,7 @@
+# 요청(Request)
+uint32 stamp                   # 탐지시간 sec
+Target[] objects    # 탐지된 객체 목록
+---
+# 응답(Response)
+bool operation_successful   # 작업 성공 여부
+string message              # 처리 결과 메시지

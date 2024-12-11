@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy, QoSHistoryPolicy
 import time 
-
+# from guard_interfaces.msg import FindTarget
 
 class CentralNode(Node):
     def __init__(self):
@@ -18,6 +18,10 @@ class CentralNode(Node):
 
         self.get_logger().info("central node init")
 
+        # self.create_service(FindTarget, 'find_target', self.find_target_callback, self.qos_profile)
+    
+    def find_target_callback(self):
+        self.get_logger().info("find target callback")
 
     
 def main(args=None):
