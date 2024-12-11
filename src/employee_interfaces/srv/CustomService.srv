@@ -1,0 +1,8 @@
+# 요청(Request)
+string location_id          # 위치 ID (예: "Zone A", "Entrance")
+DetectedObject[] objects    # 탐지된 객체 목록
+
+# 응답(Response)
+bool operation_successful   # 작업 성공 여부
+string message              # 처리 결과 메시지
+
