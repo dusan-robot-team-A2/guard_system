@@ -18,6 +18,8 @@
   <depend>tf2_ros</depend>
   <depend>math</depend>
   <depend>VIPManagementSystem</depend>
+  <depend>sensor_msgs</depend>
+  <depend>guard_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

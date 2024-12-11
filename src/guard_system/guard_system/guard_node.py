@@ -12,14 +12,12 @@ import cv2
 from nav2_msgs.action import NavigateToPose
 import math
 import tf2_ros
-from VIPManagementSystem import VIPManagementSystem
+from guard_interfaces.action import MoveTo
 
-class MoveToZoneActionServer(Node):
+class Guard_node(Node):
 
     def __init__(self):
         super().__init__('move_to_zone_action_server')
-
-        self.vip = VIPManagementSystem()
 
         self.num = 3
         self.init_pose = [0.0, 0.0, 0.0, 1.0]
@@ -44,7 +42,7 @@ class MoveToZoneActionServer(Node):
         self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
 
         # get_order_sub
-        self.get_order_subscriber = ActionServer(msg.String, '/get_order', 10, self.order_callback)
+        self.get_order_subscriber = ActionServer(MoveTo, '/get_order', 10, self.order_callback)
         # AMR_navgoal_action_client
         self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/robot2/navigate_to_pose') 
 
@@ -154,7 +152,8 @@ class MoveToZoneActionServer(Node):
         self.patrol_AMR_publisher.publish(massage)
 
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            self.vip.search_vip(self.image)
+            # self.vip.search_vip(self.image)
+            pass
         
     def feedback_callback(self, feedback):
         # 네비게이션 피드백 처리 (필요시 사용)
@@ -183,7 +182,7 @@ class MoveToZoneActionServer(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    action_server = MoveToZoneActionServer()
+    action_server = Guard_node()
     rclpy.spin(action_server)  # 노드가 계속 실행되도록
     action_server.destroy_node()
     cv2.destroyAllWindows()
