@@ -3,6 +3,7 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 import rclpy.time
 import std_msgs.msg as msg
+from action_msgs.msg import GoalStatus
 from sensor_msgs.msg import Image, CompressedImage
 from geometry_msgs.msg import Point, PoseStamped, Twist, Quaternion, Pose
 from nav2_msgs.srv import SetInitialPose
@@ -12,11 +13,14 @@ import cv2
 from nav2_msgs.action import NavigateToPose
 import math
 import tf2_ros
+from VIPManagementSystem import VIPManagementSystem
 
 class MoveToZoneActionServer(Node):
 
     def __init__(self):
         super().__init__('move_to_zone_action_server')
+
+        self.vip = VIPManagementSystem()
 
         self.num = 3
         self.init_pose = [0.0, 0.0, 0.0, 1.0]
@@ -34,7 +38,7 @@ class MoveToZoneActionServer(Node):
         self.set_initial_pose(*self.init_pose)
 
         # GUARD AMR_Image sub
-        self.AMR_image_subscriber = self.create_subscription(Image,'/tb3_0/camera/image_raw',10)
+        self.AMR_image_subscriber = self.create_subscription(Image,'/tb3_0/camera/image_raw',10, self.image_callback)
         # SM_tracked_image_pub
         self.sm_tracked_image_publisher = self.create_publisher(Image, 'tracked_image', 10)
         # patrol_AMR_pub
@@ -43,7 +47,7 @@ class MoveToZoneActionServer(Node):
         # get_order_sub
         self.get_order_subscriber = self.create_subscription(msg.String, 'get_order', 10, self.order_callback)
         # AMR_navgoal_action_client
-        self.amr_navgoal_client = ActionClient(self, NavigateToPose, 'navigate_to_pose') 
+        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/tb3_1/navigate_to_pose') 
 
         self.img_timer = self.create_timer(0.1, self.image_callback)
 
@@ -99,7 +103,9 @@ class MoveToZoneActionServer(Node):
 
             goal_pos = NavigateToPose.Goal()
             goal_pos.pose = goal_msg
-            self.amr_navgoal_client.send_goal_async(goal_pos, feedback_callback=self.feedback_callback)            
+            future = self.amr_navgoal_client.send_goal_async(goal_pos, feedback_callback=self.feedback_callback)
+
+            future.add_done_callback(self.goal_response_callback)
 
             # annotated_frame, track_ids, class_names, boxes, confidences = self.detect_objects()
             # if 'car' in class_names:
@@ -146,6 +152,12 @@ class MoveToZoneActionServer(Node):
             goal_pos = NavigateToPose.Goal()
             goal_pos.pose = goal_msg
             self.amr_navgoal_client.send_goal_async(goal_pos, feedback_callback=self.feedback_callback)
+    
+    def goal_response_callback(self, future):
+        result = future.result()
+
+        if result.status == GoalStatus.STATUS_SUCCEEDED:
+            self.vip.search_vip(self.image)
         
     def feedback_callback(self, feedback):
         # 네비게이션 피드백 처리 (필요시 사용)
@@ -156,38 +168,9 @@ class MoveToZoneActionServer(Node):
         bridge = CvBridge()
         return bridge.imgmsg_to_cv2(ros_image, encoding='bgr8')
 
-    def image_callback(self):
-        # 객체 감지 및 추적
-        try:
-            detections, track_ids, class_names, boxes, confidences = self.detect_objects(self.frame, self.self.results)
-        except:
-            return False
+    def image_callback(self, image):
+        self.image = image
         
-        # tracking
-        self.tracking()
-
-        ros_image = self.convert_cv2_to_ros_image(detections)
-        # ros_image.header = msg.Header()
-        # ros_image.header.stamp = self.get_clock().now().to_msg()
-        self.AMR_image_publisher.publish(ros_image)
-        self.get_logger().info("Publishing video frame")
-
-    def set_initial_pose(self, x, y, z, w):
-        req = SetInitialPose.Request()
-        req.pose.header.frame_id = 'map'
-        req.pose.pose.pose.position = Point(x=x, y=y, z=0.0)
-        req.pose.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=z, w=w)
-        req.pose.pose.covariance = [
-            0.1, 0.0, 0.0, 0.0, 0.0, 0.1,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.1, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.01
-        ]
-
-        future = self.set_initial_pose_service_client.call_async(req)
-        future.add_done_callback(self.handle_initial_pose_response)
 
     def handle_initial_pose_response(self, future):
         try:
