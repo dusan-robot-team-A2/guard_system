@@ -9,6 +9,7 @@ from geometry_msgs.msg import Point, PoseStamped, Twist, Quaternion, Pose
 from nav2_msgs.srv import SetInitialPose
 from cv_bridge import CvBridge
 import cv2
+from VIPManagementSystem import VIPManagementSystem
 from nav2_msgs.action import NavigateToPose
 import math
 import tf2_ros
@@ -18,6 +19,8 @@ class Guard_node(Node):
 
     def __init__(self):
         super().__init__('move_to_zone_action_server')
+
+        self.vip = VIPManagementSystem()
 
         self.num = 3
         self.init_pose = [0.0, 0.0, 0.0, 1.0]
@@ -152,8 +155,7 @@ class Guard_node(Node):
         self.patrol_AMR_publisher.publish(massage)
 
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            # self.vip.search_vip(self.image)
-            pass
+            self.vip.SIFT_feature_matching(self.image)
         
     def feedback_callback(self, feedback):
         # 네비게이션 피드백 처리 (필요시 사용)

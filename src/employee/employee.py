@@ -4,7 +4,7 @@ import numpy as np
 import time
 from math import sin, cos, pi
 from matplotlib import pyplot as plt
-
+from src.guard_system.guard_system.VIPManagementSystem import VIPManagementSystem
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -36,6 +36,8 @@ class ResidentRecognitionRobot(Node):
             QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
         )
 
+        self.vip = VIPManagementSystem()
+
         # 라이다 데이터 구독
         self.create_subscription(
             LaserScan,
@@ -59,11 +61,6 @@ class ResidentRecognitionRobot(Node):
         self.security_robot_called = False
         self.security_robot_arrived = False
 
-        # 주민 데이터베이스
-        self.resident_database = {
-            'John Doe': 'resident_image_1.jpg',
-            'Jane Doe': 'resident_image_2.jpg'
-        }
         self.bridge = CvBridge()
 
         # 순찰 경로 설정
@@ -117,45 +114,9 @@ class ResidentRecognitionRobot(Node):
         self.vel_pub.publish(twist)
 
     def detect_and_recognize_faces(self, frame):
-        for resident_name, resident_image_path in self.resident_database.items():
-            self.get_logger().info(f"{resident_name}에 대한 매칭을 시도합니다.")
-            match_result = self.SIFT_feature_matching(resident_image_path, frame)
-            if match_result:
-                self.get_logger().info(f"{resident_name} 매칭 성공!")
-                return
-
-        self.get_logger().warn("알 수 없는 사람이 감지되었습니다.")
-        if not self.security_robot_called:
+        res = self.vip.SIFT_feature_matching(frame)
+        if res:
             self.call_security_robot()
-
-    def SIFT_feature_matching(self, img1, img2, n=1000):
-        try:
-            t1 = cv2.imread(img1, 0)
-            t2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-
-            sift = cv2.SIFT_create()
-
-            kp1, des1 = sift.detectAndCompute(t1, None)
-            kp2, des2 = sift.detectAndCompute(t2, None)
-
-            f = cv2.drawKeypoints(t1, kp1, None, [0, 0, 255], flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-            nf = cv2.drawKeypoints(t2, kp2, None, [255, 0, 0], flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-
-            bf = cv2.BFMatcher()
-            matches = bf.match(des1, des2)
-
-            matches = sorted(matches, key=lambda x: x.distance)
-
-            result = cv2.drawMatches(t1, kp1, t2, kp2, matches[:min(n, len(matches))], None, [0, 0, 255], flags=2)
-
-            plt.imshow(result, interpolation='bicubic')
-            plt.axis('off')
-            plt.show()
-
-            return len(matches) > 10
-        except Exception as e:
-            self.get_logger().error(f"SIFT 매칭 중 오류 발생: {e}")
-            return False
 
     def call_security_robot(self):
         self.security_robot_called = True
@@ -195,4 +156,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
