@@ -1,0 +1,12 @@
+# Goal 정의 (요청)
+geometry_msgs/Point position
+
+---
+
+# Result 정의 (응답)
+bool success
+string message  
+
+---
+
+# Feedback 정의 (중간 상태 업데이트)
