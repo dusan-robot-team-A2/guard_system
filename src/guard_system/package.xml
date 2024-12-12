@@ -7,6 +7,8 @@
   <maintainer email="rbxorns1@naver.com">pgt</maintainer>
   <license>TODO: License declaration</license>
 
+  <exec_depend>central_controller</exec_depend>
+
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>

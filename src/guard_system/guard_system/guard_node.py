@@ -44,7 +44,7 @@ class Guard_node(Node):
         self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
 
         # get_order_sub
-        self.get_order_subscriber = ActionServer(MoveTo, '/get_order', 10, self.order_callback)
+        self.get_order_subscriber = ActionServer(MoveTo, 'get_order', 10, self.order_callback)
         # AMR_navgoal_action_client
         self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/robot2/navigate_to_pose') 
 
@@ -141,12 +141,12 @@ class Guard_node(Node):
     
     def goal_response_callback(self, future):
         result = future.result()
-        massage = msg.String()
-        massage.data = 'found target'
-        self.patrol_AMR_publisher.publish(massage)
-
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            self.vip.SIFT_feature_matching(self.image)
+            res1 = self.vip.SIFT_feature_matching(self.image)
+            res2 = MoveTo.result()
+            res2.success = res1
+            res2.message = '도착 완료'
+            return res2
         
     def feedback_callback(self, feedback):
         # 네비게이션 피드백 처리 (필요시 사용)

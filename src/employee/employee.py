@@ -1,5 +1,3 @@
-import os
-import cv2
 import numpy as np
 import time
 from math import sin, cos, pi
@@ -33,7 +31,7 @@ class ResidentRecognitionRobot(Node):
             Image,
             f'/{self.robot_name}/camera/image_raw',
             self.camera_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
 
         self.vip = VIPManagementSystem()
@@ -43,7 +41,7 @@ class ResidentRecognitionRobot(Node):
             LaserScan,
             f'/{self.robot_name}/scan',
             self.lidar_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
 
         # 관제탑 호출 서비스 클라이언트
@@ -56,7 +54,7 @@ class ResidentRecognitionRobot(Node):
             Bool,
             f'/{self.robot_name}/security_arrival',
             self.security_arrival_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
         self.security_robot_called = False
         self.security_robot_arrived = False
