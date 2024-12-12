@@ -8,20 +8,16 @@
   <license>TODO: License declaration</license>
 
   <exec_depend>central_controller</exec_depend>
-  <exec_depend>VIPManagementSystem</exec_depend>
 
-  <depend>rclpy</depend>
-  <depend>action_msgs</depend>
-  <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>nav2_msgs</depend>
-  <depend>cv_bridge</depend>
-  <depend>numpy</depend>
-  <depend>cv2</depend>
-  <depend>tf2_ros</depend>
-  <depend>math</depend>
-  <depend>guard_interfaces</depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>action_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>guard_interfaces</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
