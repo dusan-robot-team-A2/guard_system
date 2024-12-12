@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'central_controller = central_controller.central_controller:main',
         ],
     },
 )
