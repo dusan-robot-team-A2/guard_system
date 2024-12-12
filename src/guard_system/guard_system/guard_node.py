@@ -17,7 +17,7 @@ from guard_interfaces.action import MoveTo
 class Guard_node(Node):
 
     def __init__(self):
-        super().__init__('move_to_zone_action_server')
+        super().__init__('guard_node')
 
         self.vip = VIPManagementSystem()
 
@@ -175,9 +175,9 @@ class Guard_node(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    action_server = Guard_node()
-    rclpy.spin(action_server)  # 노드가 계속 실행되도록
-    action_server.destroy_node()
+    node = Guard_node()
+    rclpy.spin(node)  # 노드가 계속 실행되도록
+    node.destroy_node()
     cv2.destroyAllWindows()
     rclpy.shutdown()
 
