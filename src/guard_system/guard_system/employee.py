@@ -2,7 +2,7 @@ import numpy as np
 import time
 from math import sin, cos, pi
 from matplotlib import pyplot as plt
-from src.guard_system.guard_system.VIPManagementSystem import VIPManagementSystem
+from .VIPManagementSystem import VIPManagementSystem
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
