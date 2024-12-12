@@ -1,9 +1,8 @@
-import os
-import cv2
 import numpy as np
 import time
 from math import sin, cos, pi
-
+from matplotlib import pyplot as plt
+from src.guard_system.guard_system.VIPManagementSystem import VIPManagementSystem
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -14,7 +13,6 @@ from sensor_msgs.msg import Image, LaserScan
 from cv_bridge import CvBridge
 from std_srvs.srv import Trigger
 from std_msgs.msg import Bool
-import dlib
 
 class ResidentRecognitionRobot(Node):
     def __init__(self, robot_name):
@@ -36,6 +34,8 @@ class ResidentRecognitionRobot(Node):
             QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
 
+        self.vip = VIPManagementSystem()
+
         # 라이다 데이터 구독
         self.create_subscription(
             LaserScan,
@@ -54,31 +54,12 @@ class ResidentRecognitionRobot(Node):
             Bool,
             f'/{self.robot_name}/security_arrival',
             self.security_arrival_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
         self.security_robot_called = False
         self.security_robot_arrived = False
 
-        # 주민 데이터베이스
-        self.resident_database = {
-            'John Doe': 'face_data_1.npy',
-            'Jane Doe': 'face_data_2.npy'
-        }
         self.bridge = CvBridge()
-
-        # 얼굴 탐지 및 인코딩 모델 초기화
-        self.detector = dlib.get_frontal_face_detector()
-        self.predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-        self.face_rec_model = dlib.face_recognition_model_v1("dlib_face_recognition_resnet_model_v1.dat")
-
-        # 주민 얼굴 인코딩 데이터 로드
-        self.known_face_encodings = []
-        self.known_face_names = []
-
-        for name, file in self.resident_database.items():
-            face_encoding = np.load(file)
-            self.known_face_encodings.append(face_encoding)
-            self.known_face_names.append(name)
 
         # 순찰 경로 설정
         self.patrol_points = [
@@ -88,13 +69,11 @@ class ResidentRecognitionRobot(Node):
             (4.0, -1.0)
         ]
         self.current_patrol_index = 0
+        self.navigation_in_progress = False
 
-        # 순찰 타이머 시작
-        self.timer = self.create_timer(1.0, self.patrol_callback)
-
-    def patrol_callback(self):
-        if self.security_robot_called and not self.security_robot_arrived:
-            self.get_logger().info("경비 로봇 도착 대기 중...")
+    def send_to_next_waypoint(self):
+        if self.navigation_in_progress:
+            self.get_logger().info("현재 내비게이션이 진행 중입니다.")
             return
 
         point = self.patrol_points[self.current_patrol_index]
@@ -108,8 +87,23 @@ class ResidentRecognitionRobot(Node):
         goal_msg.pose.pose.orientation.w = 1.0
 
         self.nav_client.wait_for_server()
-        self.get_logger().info(f"순찰 포인트로 이동 중: x={point[0]}, y={point[1]}")
-        self.nav_client.send_goal_async(goal_msg)
+        self.get_logger().info(f"웨이포인트로 이동 중: x={point[0]}, y={point[1]}")
+        self.navigation_in_progress = True
+        send_goal_future = self.nav_client.send_goal_async(goal_msg)
+        send_goal_future.add_done_callback(self.navigation_done_callback)
+
+    def navigation_done_callback(self, future):
+        try:
+            result = future.result()
+            if result.status == 4:  # STATUS_SUCCEEDED
+                self.get_logger().info("목표 지점에 도착했습니다.")
+            else:
+                self.get_logger().warn(f"내비게이션 실패: 상태 {result.status}")
+        except Exception as e:
+            self.get_logger().error(f"내비게이션 중 오류 발생: {e}")
+        finally:
+            self.navigation_in_progress = False
+            self.send_to_next_waypoint()  # 다음 웨이포인트로 이동
 
     def camera_callback(self, msg):
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -131,53 +125,9 @@ class ResidentRecognitionRobot(Node):
         self.vel_pub.publish(twist)
 
     def detect_and_recognize_faces(self, frame):
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        face_locations = self.detect_faces(rgb_frame)
-        face_encodings = self.encode_faces(rgb_frame, face_locations)
-
-        for face_encoding, face_location in zip(face_encodings, face_locations):
-            matches = self.compare_faces(self.known_face_encodings, face_encoding)
-            name = "Unknown"
-
-            face_distances = self.face_distance(self.known_face_encodings, face_encoding)
-            best_match_index = np.argmin(face_distances)
-            if matches[best_match_index]:
-                name = self.known_face_names[best_match_index]
-
-            self.display_face(frame, face_location, name)
-
-            if name != "Unknown":
-                self.get_logger().info(f"주민 확인: {name}. 환영합니다!")
-            else:
-                self.get_logger().warn("알 수 없는 사람을 감지했습니다.")
-                if not self.security_robot_called:
-                    self.call_security_robot()
-
-        cv2.imshow("Resident Recognition", frame)
-        cv2.waitKey(1)
-
-    def detect_faces(self, rgb_frame):
-        return self.detector(rgb_frame, 1)
-
-    def encode_faces(self, rgb_frame, face_locations):
-        encodings = []
-        for face in face_locations:
-            shape = self.predictor(rgb_frame, face)
-            encoding = np.array(self.face_rec_model.compute_face_descriptor(rgb_frame, shape))
-            encodings.append(encoding)
-        return encodings
-
-    def compare_faces(self, known_encodings, face_encoding, tolerance=0.6):
-        distances = self.face_distance(known_encodings, face_encoding)
-        return distances <= tolerance
-
-    def face_distance(self, known_encodings, face_encoding):
-        return np.linalg.norm(known_encodings - face_encoding, axis=1)
-
-    def display_face(self, frame, face_location, name):
-        top, right, bottom, left = face_location.top(), face_location.right(), face_location.bottom(), face_location.left()
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+        res = self.vip.SIFT_feature_matching(frame)
+        if res:
+            self.call_security_robot()
 
     def call_security_robot(self):
         self.security_robot_called = True
@@ -208,6 +158,7 @@ def main(args=None):
     resident_robot = ResidentRecognitionRobot(robot_name)
 
     try:
+        resident_robot.send_to_next_waypoint()
         rclpy.spin(resident_robot)
     except KeyboardInterrupt:
         resident_robot.get_logger().info("주민 인식 로봇을 종료합니다.")

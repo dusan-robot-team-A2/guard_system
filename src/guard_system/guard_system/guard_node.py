@@ -9,15 +9,17 @@ from geometry_msgs.msg import Point, PoseStamped, Twist, Quaternion, Pose
 from nav2_msgs.srv import SetInitialPose
 from cv_bridge import CvBridge
 import cv2
+from .VIPManagementSystem import VIPManagementSystem
 from nav2_msgs.action import NavigateToPose
 import math
-import tf2_ros
 from guard_interfaces.action import MoveTo
 
 class Guard_node(Node):
 
     def __init__(self):
-        super().__init__('move_to_zone_action_server')
+        super().__init__('guard_node')
+
+        self.vip = VIPManagementSystem()
 
         self.num = 3
         self.init_pose = [0.0, 0.0, 0.0, 1.0]
@@ -35,24 +37,16 @@ class Guard_node(Node):
         self.set_initial_pose(*self.init_pose)
 
         # GUARD AMR_Image sub
-        self.AMR_image_subscriber = self.create_subscription(Image,'/robot1/camera/image_raw',10, self.image_callback)
+        self.AMR_image_subscriber = self.create_subscription(Image,'/robot2/camera/image_raw',self.image_callback, 10)
         # SM_tracked_image_pub
         self.sm_tracked_image_publisher = self.create_publisher(Image, '/tracked_image', 10)
         # patrol_AMR_pub
         self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
 
         # get_order_sub
-        self.get_order_subscriber = ActionServer(MoveTo, '/get_order', 10, self.order_callback)
+        self.get_order_subscriber = ActionServer(self, MoveTo, 'get_order', self.order_callback)
         # AMR_navgoal_action_client
         self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/robot2/navigate_to_pose') 
-
-        self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        self.tf_timer = self.create_timer(1.0, self.tf_timer_callback)
-
-        
-        # 5개 영역의 하나의 꼭짓점 좌표 정의 (각 영역별로 임의의 path를 지정해주는 로직)
-        self.home_pos = Pose(position = Point(x=0.043317, y=0.033049), orientation = self.euler_to_quaternion(0, 0, -0.003))
 
     def euler_to_quaternion(self, roll, pitch, yaw):
         # Convert Euler angles to a quaternion
@@ -147,13 +141,12 @@ class Guard_node(Node):
     
     def goal_response_callback(self, future):
         result = future.result()
-        massage = msg.String()
-        massage.data = 'found target'
-        self.patrol_AMR_publisher.publish(massage)
-
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            # self.vip.search_vip(self.image)
-            pass
+            res1 = self.vip.SIFT_feature_matching(self.image)
+            res2 = MoveTo.result()
+            res2.success = res1
+            res2.message = '도착 완료'
+            return res2
         
     def feedback_callback(self, feedback):
         # 네비게이션 피드백 처리 (필요시 사용)
@@ -182,9 +175,9 @@ class Guard_node(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    action_server = Guard_node()
-    rclpy.spin(action_server)  # 노드가 계속 실행되도록
-    action_server.destroy_node()
+    node = Guard_node()
+    rclpy.spin(node)  # 노드가 계속 실행되도록
+    node.destroy_node()
     cv2.destroyAllWindows()
     rclpy.shutdown()
 
