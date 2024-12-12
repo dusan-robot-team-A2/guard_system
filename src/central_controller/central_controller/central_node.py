@@ -5,16 +5,6 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSDurabilityPolicy, QoS
 import time
 from enum import Enum
 from types import SimpleNamespace
-<<<<<<< HEAD
-
-from guard_interfaces.srv import FindTarget
-
-class RobotStatus(Enum):
-    IDLE = 0
-    MOVING = 1
-    WORKING = 2
-    ERROR = 3
-=======
 import threading
 import asyncio
 
@@ -26,7 +16,6 @@ class RobotStatus(Enum):
     STANDBY = 0
     PATROL = 1
     MOVING = 2
->>>>>>> feat/central_controller
 
 class CentralNode(Node):
     def __init__(self):
