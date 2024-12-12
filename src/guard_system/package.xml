@@ -10,6 +10,7 @@
   <exec_depend>central_controller</exec_depend>
 
   <depend>rclpy</depend>
+  <depend>action_msgs</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
@@ -20,7 +21,6 @@
   <depend>tf2_ros</depend>
   <depend>math</depend>
   <depend>VIPManagementSystem</depend>
-  <depend>sensor_msgs</depend>
   <depend>guard_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>

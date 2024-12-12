@@ -27,10 +27,13 @@ def generate_launch_description():
 
     # create and return launch description object
     return LaunchDescription(
-        guard_node,
-        central_controller,
-        
         [
+            guard_node,
+            central_controller,
+
+            ExecuteProcess(
+                cmd=["gazebo"], output="screen"
+            ),
             ExecuteProcess(
                 cmd=["ros2", "run", "rviz2", "rviz2"], output="screen"
             ),
