@@ -2,11 +2,7 @@ import numpy as np
 import time
 from math import sin, cos, pi
 from matplotlib import pyplot as plt
-<<<<<<< HEAD
-
-=======
 from src.guard_system.guard_system.VIPManagementSystem import VIPManagementSystem
->>>>>>> origin/main
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -116,42 +112,9 @@ class ResidentRecognitionRobot(Node):
         self.vel_pub.publish(twist)
 
     def detect_and_recognize_faces(self, frame):
-<<<<<<< HEAD
-        # 주민 데이터베이스와 매칭을 위한 SIFT 기반 이미지 매칭 수행
-        for resident_name, resident_image_path in self.resident_database.items():
-            self.get_logger().info(f"{resident_name}에 대한 매칭을 시도합니다.")
-            match_result = self.SIFT_feature_matching(resident_image_path, frame)
-            if match_result:
-                self.get_logger().info(f"{resident_name} 매칭 성공!")
-                return
-
-        self.get_logger().warn("알 수 없는 사람이 감지되었습니다.")
-        if not self.security_robot_called:
-            self.call_security_robot()
-
-    def SIFT_feature_matching(self, img1, img2, n=1000):
-        try:
-            t1 = cv2.imread(img1, 0)
-            t2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-
-            sift = cv2.SIFT_create()
-
-            kp1, des1 = sift.detectAndCompute(t1, None)
-            kp2, des2 = sift.detectAndCompute(t2, None)
-
-            bf = cv2.BFMatcher()
-            matches = bf.match(des1, des2)
-
-            matches = sorted(matches, key=lambda x: x.distance)
-            return len(matches[:n]) > 10  # 매칭된 포인트가 10개 이상일 경우 성공으로 간주
-        except Exception as e:
-            self.get_logger().error(f"SIFT 매칭 중 오류 발생: {e}")
-            return False
-=======
         res = self.vip.SIFT_feature_matching(frame)
         if res:
             self.call_security_robot()
->>>>>>> origin/main
 
     def call_security_robot(self):
         self.security_robot_called = True
