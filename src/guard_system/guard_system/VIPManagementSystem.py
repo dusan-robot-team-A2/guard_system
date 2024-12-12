@@ -11,7 +11,7 @@ class VIPManagementSystem:
     def SIFT_feature_matching(self, frame, n=1000):
         img_path = ''
         if frame:
-            t1 = cv2.imread(img_path, 0)
+            t1 = cv2.imread(img_path, cv2.COLOR_BGR2GRAY)
             t2 = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             sift = cv2.SIFT_create()
