@@ -31,23 +31,17 @@ class ResidentRecognitionRobot(Node):
             Image,
             f'/{self.robot_name}/camera/image_raw',
             self.camera_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
         )
 
         self.vip = VIPManagementSystem()
 
         self.qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,  # 데이터 손실 없이 안정적으로 전송
-            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL, # 구독자가 서버와 연결된 후 그 동안 수집된 데이터를 받을 수 있음
-            history=QoSHistoryPolicy.KEEP_LAST, # 최근 메시지만 유지
-            depth=10  # 최근 10개의 메시지를 유지
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=10
         )
-
-
-        # # 관제탑 호출 서비스 클라이언트
-        # self.call_security_client = self.create_client(Trigger, f'/{self.robot_name}/call_security_robot')
-        # while not self.call_security_client.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().warn("관제탑 호출 서비스 대기 중...")
 
         self.call_security_client = self.create_client(FindTarget, 'find_target', qos_profile=self.qos_profile)
         while not self.call_security_client.wait_for_service(timeout_sec=1.0):
@@ -58,7 +52,7 @@ class ResidentRecognitionRobot(Node):
             Bool,
             f'/{self.robot_name}/security_arrival',
             self.security_arrival_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
         )
         self.security_robot_called = False
         self.security_robot_arrived = False
@@ -74,12 +68,17 @@ class ResidentRecognitionRobot(Node):
         ]
         self.current_patrol_index = 0
         self.navigation_in_progress = False
+        self.stopped_due_to_intruder = False
 
         self.send_to_next_waypoint()
 
     def send_to_next_waypoint(self):
         if self.navigation_in_progress:
             self.get_logger().info("현재 내비게이션이 진행 중입니다.")
+            return
+
+        if self.stopped_due_to_intruder:
+            self.get_logger().info("침입자 감지로 인해 대기 중입니다.")
             return
 
         point = self.patrol_points[self.current_patrol_index]
@@ -125,35 +124,34 @@ class ResidentRecognitionRobot(Node):
         res = self.vip.SIFT_feature_matching(frame)
         if res:
             self.get_logger().info("외부인 발견")
-            self.call_security_robot()
+            self.stop_and_call_security_robot()
 
-    def call_security_robot(self):
+    def stop_and_call_security_robot(self):
+        if self.security_robot_called:
+            self.get_logger().info("이미 경비 로봇을 호출했습니다.")
+            return
+
         self.security_robot_called = True
+        self.stopped_due_to_intruder = True
         self.get_logger().info("관제탑에 경비 로봇 호출 요청 중...")
 
-        request = Trigger.Request()
         request = FindTarget.Request()
-        request = FindTarget.Request()
-        request.stamp = 0
-
         point = Point()
         point.x = 100.0
         point.y = 100.0
-        
+
         target = Target()
         target.object_id = 1
-        target.class_name = "test class"
+        target.class_name = "Intruder"
         target.object_position = point
-        objects = [target,]
-
-        request.objects = objects
+        request.objects = [target]
 
         future = self.call_security_client.call_async(request)
         future.add_done_callback(self.handle_call_security_response)
 
     def handle_call_security_response(self, future):
         try:
-            response:FindTarget.Response = future.result()
+            response: FindTarget.Response = future.result()
             if response.operation_successful:
                 self.get_logger().info("경비 로봇 호출 성공!")
             else:
@@ -163,9 +161,20 @@ class ResidentRecognitionRobot(Node):
 
     def security_arrival_callback(self, msg):
         if msg.data:
+            self.get_logger().info("경비 로봇 도착! 순찰을 재개합니다.")
             self.security_robot_arrived = True
             self.security_robot_called = False
-            self.get_logger().info("경비 로봇 도착! 순찰을 재개합니다.")
+            self.stopped_due_to_intruder = False
+            self.send_to_next_waypoint()
+
+    def avoid_obstacle(self):
+        twist = Twist()
+        twist.linear.x = 0.0
+        twist.angular.z = 0.5
+        self.vel_pub.publish(twist)
+        time.sleep(1)
+        twist.angular.z = 0.0
+        self.vel_pub.publish(twist)
 
 def main(args=None):
     rclpy.init(args=args)
@@ -173,7 +182,6 @@ def main(args=None):
     resident_robot = ResidentRecognitionRobot(robot_name)
 
     try:
-        # resident_robot.send_to_next_waypoint()
         rclpy.spin(resident_robot)
     except KeyboardInterrupt:
         resident_robot.get_logger().info("주민 인식 로봇을 종료합니다.")
