@@ -178,7 +178,7 @@ class GUI(QMainWindow):
 
         self.x = self.map_x +odom_x
 
-        self.y = self.map_y +odom_y
+        self.y = self.map_y - odom_y
 
 
 

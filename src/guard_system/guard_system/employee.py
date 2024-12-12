@@ -20,9 +20,6 @@ class ResidentRecognitionRobot(Node):
         # 내비게이션 클라이언트
         self.nav_client = ActionClient(self, NavigateToPose, f'{self.robot_name}/navigate_to_pose')
 
-        # 속도 퍼블리셔
-        self.vel_pub = self.create_publisher(Twist, f'/{self.robot_name}/cmd_vel', 10)
-
         # 카메라 이미지 구독
         self.create_subscription(
             Image,
@@ -33,13 +30,6 @@ class ResidentRecognitionRobot(Node):
 
         self.vip = VIPManagementSystem()
 
-        # 라이다 데이터 구독
-        self.create_subscription(
-            LaserScan,
-            f'/{self.robot_name}/scan',
-            self.lidar_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
-        )
 
         # 관제탑 호출 서비스 클라이언트
         self.call_security_client = self.create_client(Trigger, f'/{self.robot_name}/call_security_robot')
@@ -111,15 +101,6 @@ class ResidentRecognitionRobot(Node):
         if min_range < 0.5:
             self.get_logger().warn(f"장애물 감지: 최소 거리 {min_range:.2f}m")
             self.avoid_obstacle()
-
-    def avoid_obstacle(self):
-        twist = Twist()
-        twist.linear.x = 0.0
-        twist.angular.z = 0.5
-        self.vel_pub.publish(twist)
-        time.sleep(1)
-        twist.angular.z = 0.0
-        self.vel_pub.publish(twist)
 
     def detect_and_recognize_faces(self, frame):
         res = self.vip.SIFT_feature_matching(frame)

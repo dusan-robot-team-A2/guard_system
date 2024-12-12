@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'guard_node = guard_system.guard_node:main',
+            'employee_node = guard_system.employee:main'
         ],
     },
 )
