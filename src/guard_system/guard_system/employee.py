@@ -1,7 +1,4 @@
-import numpy as np
 import time
-from math import sin, cos, pi
-from matplotlib import pyplot as plt
 from .VIPManagementSystem import VIPManagementSystem
 import rclpy
 from rclpy.node import Node
