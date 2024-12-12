@@ -1,10 +1,12 @@
-import os
-import cv2
 import numpy as np
 import time
 from math import sin, cos, pi
 from matplotlib import pyplot as plt
+<<<<<<< HEAD
 
+=======
+from src.guard_system.guard_system.VIPManagementSystem import VIPManagementSystem
+>>>>>>> origin/main
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -36,6 +38,8 @@ class ResidentRecognitionRobot(Node):
             QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
         )
 
+        self.vip = VIPManagementSystem()
+
         # 라이다 데이터 구독
         self.create_subscription(
             LaserScan,
@@ -54,16 +58,11 @@ class ResidentRecognitionRobot(Node):
             Bool,
             f'/{self.robot_name}/security_arrival',
             self.security_arrival_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
         self.security_robot_called = False
         self.security_robot_arrived = False
 
-        # 주민 데이터베이스
-        self.resident_database = {
-            'John Doe': 'face_data_1.npy',
-            'Jane Doe': 'face_data_2.npy'
-        }
         self.bridge = CvBridge()
 
         # 순찰 경로 설정
@@ -117,6 +116,7 @@ class ResidentRecognitionRobot(Node):
         self.vel_pub.publish(twist)
 
     def detect_and_recognize_faces(self, frame):
+<<<<<<< HEAD
         # 주민 데이터베이스와 매칭을 위한 SIFT 기반 이미지 매칭 수행
         for resident_name, resident_image_path in self.resident_database.items():
             self.get_logger().info(f"{resident_name}에 대한 매칭을 시도합니다.")
@@ -147,6 +147,11 @@ class ResidentRecognitionRobot(Node):
         except Exception as e:
             self.get_logger().error(f"SIFT 매칭 중 오류 발생: {e}")
             return False
+=======
+        res = self.vip.SIFT_feature_matching(frame)
+        if res:
+            self.call_security_robot()
+>>>>>>> origin/main
 
     def call_security_robot(self):
         self.security_robot_called = True
