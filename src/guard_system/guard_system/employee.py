@@ -4,12 +4,18 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
+from rclpy.qos import QoSReliabilityPolicy, QoSDurabilityPolicy, QoSHistoryPolicy
+
 from geometry_msgs.msg import Twist
 from nav2_msgs.action import NavigateToPose
 from sensor_msgs.msg import Image, LaserScan
 from cv_bridge import CvBridge
 from std_srvs.srv import Trigger
 from std_msgs.msg import Bool
+
+from guard_interfaces.srv import FindTarget
+from guard_interfaces.msg import Target
+from geometry_msgs.msg import Point
 
 class ResidentRecognitionRobot(Node):
     def __init__(self, robot_name):
@@ -30,9 +36,20 @@ class ResidentRecognitionRobot(Node):
 
         self.vip = VIPManagementSystem()
 
+        self.qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,  # 데이터 손실 없이 안정적으로 전송
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL, # 구독자가 서버와 연결된 후 그 동안 수집된 데이터를 받을 수 있음
+            history=QoSHistoryPolicy.KEEP_LAST, # 최근 메시지만 유지
+            depth=10  # 최근 10개의 메시지를 유지
+        )
 
-        # 관제탑 호출 서비스 클라이언트
-        self.call_security_client = self.create_client(Trigger, f'/{self.robot_name}/call_security_robot')
+
+        # # 관제탑 호출 서비스 클라이언트
+        # self.call_security_client = self.create_client(Trigger, f'/{self.robot_name}/call_security_robot')
+        # while not self.call_security_client.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().warn("관제탑 호출 서비스 대기 중...")
+
+        self.call_security_client = self.create_client(FindTarget, 'find_target', qos_profile=self.qos_profile)
         while not self.call_security_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn("관제탑 호출 서비스 대기 중...")
 
@@ -57,6 +74,8 @@ class ResidentRecognitionRobot(Node):
         ]
         self.current_patrol_index = 0
         self.navigation_in_progress = False
+
+        self.send_to_next_waypoint()
 
     def send_to_next_waypoint(self):
         if self.navigation_in_progress:
@@ -105,19 +124,37 @@ class ResidentRecognitionRobot(Node):
     def detect_and_recognize_faces(self, frame):
         res = self.vip.SIFT_feature_matching(frame)
         if res:
+            self.get_logger().info("외부인 발견")
             self.call_security_robot()
 
     def call_security_robot(self):
         self.security_robot_called = True
         self.get_logger().info("관제탑에 경비 로봇 호출 요청 중...")
+
         request = Trigger.Request()
+        request = FindTarget.Request()
+        request = FindTarget.Request()
+        request.stamp = 0
+
+        point = Point()
+        point.x = 100.0
+        point.y = 100.0
+        
+        target = Target()
+        target.object_id = 1
+        target.class_name = "test class"
+        target.object_position = point
+        objects = [target,]
+
+        request.objects = objects
+
         future = self.call_security_client.call_async(request)
         future.add_done_callback(self.handle_call_security_response)
 
     def handle_call_security_response(self, future):
         try:
-            response = future.result()
-            if response.success:
+            response:FindTarget.Response = future.result()
+            if response.operation_successful:
                 self.get_logger().info("경비 로봇 호출 성공!")
             else:
                 self.get_logger().warn("경비 로봇 호출 실패!")
@@ -136,7 +173,7 @@ def main(args=None):
     resident_robot = ResidentRecognitionRobot(robot_name)
 
     try:
-        resident_robot.send_to_next_waypoint()
+        # resident_robot.send_to_next_waypoint()
         rclpy.spin(resident_robot)
     except KeyboardInterrupt:
         resident_robot.get_logger().info("주민 인식 로봇을 종료합니다.")
