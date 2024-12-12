@@ -2,7 +2,7 @@ import numpy as np
 import time
 from math import sin, cos, pi
 from matplotlib import pyplot as plt
-from src.guard_system.guard_system.VIPManagementSystem import VIPManagementSystem
+from .VIPManagementSystem import VIPManagementSystem
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
@@ -31,7 +31,7 @@ class ResidentRecognitionRobot(Node):
             Image,
             f'/{self.robot_name}/camera/image_raw',
             self.camera_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
 
         self.vip = VIPManagementSystem()
@@ -41,7 +41,7 @@ class ResidentRecognitionRobot(Node):
             LaserScan,
             f'/{self.robot_name}/scan',
             self.lidar_callback,
-            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=ReliabilityPolicy.VOLATILE)
+            QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.VOLATILE)
         )
 
         # 관제탑 호출 서비스 클라이언트
@@ -69,13 +69,11 @@ class ResidentRecognitionRobot(Node):
             (4.0, -1.0)
         ]
         self.current_patrol_index = 0
+        self.navigation_in_progress = False
 
-        # 순찰 타이머 시작
-        self.timer = self.create_timer(1.0, self.patrol_callback)
-
-    def patrol_callback(self):
-        if self.security_robot_called and not self.security_robot_arrived:
-            self.get_logger().info("경비 로봇 도착 대기 중...")
+    def send_to_next_waypoint(self):
+        if self.navigation_in_progress:
+            self.get_logger().info("현재 내비게이션이 진행 중입니다.")
             return
 
         point = self.patrol_points[self.current_patrol_index]
@@ -89,8 +87,23 @@ class ResidentRecognitionRobot(Node):
         goal_msg.pose.pose.orientation.w = 1.0
 
         self.nav_client.wait_for_server()
-        self.get_logger().info(f"순찰 포인트로 이동 중: x={point[0]}, y={point[1]}")
-        self.nav_client.send_goal_async(goal_msg)
+        self.get_logger().info(f"웨이포인트로 이동 중: x={point[0]}, y={point[1]}")
+        self.navigation_in_progress = True
+        send_goal_future = self.nav_client.send_goal_async(goal_msg)
+        send_goal_future.add_done_callback(self.navigation_done_callback)
+
+    def navigation_done_callback(self, future):
+        try:
+            result = future.result()
+            if result.status == 4:  # STATUS_SUCCEEDED
+                self.get_logger().info("목표 지점에 도착했습니다.")
+            else:
+                self.get_logger().warn(f"내비게이션 실패: 상태 {result.status}")
+        except Exception as e:
+            self.get_logger().error(f"내비게이션 중 오류 발생: {e}")
+        finally:
+            self.navigation_in_progress = False
+            self.send_to_next_waypoint()  # 다음 웨이포인트로 이동
 
     def camera_callback(self, msg):
         cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -145,6 +158,7 @@ def main(args=None):
     resident_robot = ResidentRecognitionRobot(robot_name)
 
     try:
+        resident_robot.send_to_next_waypoint()
         rclpy.spin(resident_robot)
     except KeyboardInterrupt:
         resident_robot.get_logger().info("주민 인식 로봇을 종료합니다.")
