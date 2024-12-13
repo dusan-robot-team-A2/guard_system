@@ -1,0 +1,22 @@
+
+<?xml version="1.0" ?>
+<sdf version="1.5">
+  <model name="gundam">
+    <pose>0 0 0 0 0 0</pose>
+
+    <link name="base_link">
+      <visual name="visual">
+        <geometry>
+          <cylinder>
+            <radius>0.3</radius>
+            <length>1.0</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>
