@@ -178,7 +178,7 @@ class ResidentRecognitionRobot(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    robot_name = 'robot1'
+    robot_name = 'gundam'
     resident_robot = ResidentRecognitionRobot(robot_name)
 
     try:
