@@ -79,7 +79,12 @@ class ResidentRecognitionRobot(Node):
         self.navigation_in_progress = False
         self.stopped_due_to_intruder = False
 
+        self.timer = self.create_timer(10, self.timer_callback)
+
         self.send_to_next_waypoint()
+
+    def timer_callback(self):
+        self.stop_and_call_security_robot()
     
     def patrol_mode_callback(self, request:SetBool.Request, response:SetBool.Response):
         # 요청이 들어오면 상태를 반전시킴

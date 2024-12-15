@@ -12,6 +12,7 @@ from std_srvs.srv import SetBool
 from guard_interfaces.srv import FindTarget
 from guard_interfaces.msg import Target
 from guard_interfaces.action import MoveTo
+from geometry_msgs.msg import Point
 
 from .tracked_target import TrackedTarget
 
@@ -71,6 +72,8 @@ class CentralNode(Node):
         
         if is_there_new_target:
             self.get_logger().info("new object detected to track")
+            self.get_logger().info(str(self.target_order))
+            self.get_logger().info(str(self.tracked_targets))
 
             self.run_command_thread()
             response.keep_track = True
@@ -99,14 +102,16 @@ class CentralNode(Node):
     async def command_find(self):
         while self.target_order:
             self.get_logger().info(str(self.target_order))
-            self.get_logger().info(str(self.targets))
+            self.get_logger().info(str(self.tracked_targets))
             target_id = self.target_order.pop(0)
-            target = self.targets[target_id]
+            target = self.tracked_targets[target_id]
 
             # self.get_logger().info(f"command to go x:{target.object_position.x}, y:{target.object_position.y}")
             # time.sleep(5)
             goal_msg = MoveTo.Goal()
-            goal_msg.position = target.object_position
+            position = Point()
+            position.x, position.y = target.pose
+            goal_msg.position = position
 
             self.get_logger().info("Waiting for action server...")
             self.command_action.wait_for_server()
