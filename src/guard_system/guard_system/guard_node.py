@@ -84,15 +84,17 @@ class Guard_node(Node):
             self.get_logger().error(f"[ERROR] Service call failed: {e}")
 
     # 디지털 맵 내 지정 구역으로 이동
-    def order_callback(self, position):
-        
+    def order_callback(self, goal_handle):
+        request:MoveTo.Goal = goal_handle.request
+
+        position = request.position
         if position:
             # 목표 좌표를 PoseStamped 메시지로 생성
             goal_msg = PoseStamped()
             goal_msg.header.frame_id = 'map'  # SLAM에서 사용되는 좌표계 (보통 'map' 프레임)
             goal_msg.header.stamp = self.get_clock().now().to_msg()
-            goal_msg.pose.position.x = position.position.x
-            goal_msg.pose.position.y = position.position.y
+            goal_msg.pose.position.x = position.x
+            goal_msg.pose.position.y = position.y
             goal_msg.pose.orientation = 1.0  # 회전 값 (회전 없음)
 
             if not self.amr_navgoal_client.wait_for_server(timeout_sec=1.0):
@@ -135,16 +137,13 @@ class Guard_node(Node):
             #     move_cmd.angular.z = 0.0
             #     self.amr_cmd_vel_pub.publish(move_cmd)
         
-            if not self.amr_navgoal_client.wait_for_server(timeout_sec=1.0):
-                self.get_logger().info('Action server not available')
-                return
     
     def goal_response_callback(self, future):
         result = future.result()
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            res1 = self.vip.SIFT_feature_matching(self.image)
-            res2 = MoveTo.result()
-            res2.success = res1
+            # res1 = self.vip.SIFT_feature_matching(self.image)
+            res2 = MoveTo.Result()
+            res2.success = True
             res2.message = '도착 완료'
             return res2
         
