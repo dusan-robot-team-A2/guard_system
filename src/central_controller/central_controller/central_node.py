@@ -101,8 +101,6 @@ class CentralNode(Node):
         
     async def command_find(self):
         while self.target_order:
-            self.get_logger().info(str(self.target_order))
-            self.get_logger().info(str(self.tracked_targets))
             target_id = self.target_order.pop(0)
             target = self.tracked_targets[target_id]
 
@@ -140,6 +138,7 @@ class CentralNode(Node):
                 self.resume_patrol()
             else:
                 self.get_logger().warn(f"Failed to detect") # 실패할 경우 어떻게 할지 정해야함 target에 추가할 것인지 아닌지
+                # self.target_order.append(target_id)
 
     def resume_patrol(self):
         request = SetBool.Request()
