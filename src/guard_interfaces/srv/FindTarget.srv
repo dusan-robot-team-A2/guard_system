@@ -1,7 +1,8 @@
 # 요청(Request)
-uint32 stamp                   # 탐지시간 sec
+uint32 patrol_id    # patrol_id
 Target[] objects    # 탐지된 객체 목록
 ---
 # 응답(Response)
 bool operation_successful   # 작업 성공 여부
+bool keep_track             # tracking 해야할 것인지 여부
 string message              # 처리 결과 메시지

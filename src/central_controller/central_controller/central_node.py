@@ -8,9 +8,12 @@ from types import SimpleNamespace
 import threading
 import asyncio
 
+from std_srvs.srv import SetBool
 from guard_interfaces.srv import FindTarget
 from guard_interfaces.msg import Target
 from guard_interfaces.action import MoveTo
+
+from .tracked_target import TrackedTarget
 
 class RobotStatus(Enum):
     STANDBY = 0
@@ -33,31 +36,53 @@ class CentralNode(Node):
         self.find_target_service = self.create_service(FindTarget, 'find_target', callback=self.find_target_callback, qos_profile=self.qos_profile)
         self.command_action = ActionClient(self, MoveTo, 'get_order')
 
-        self.targets:dict[int,Target] = {}
+        self.tracked_targets:dict[int,TrackedTarget] = {}
         self.target_order:list[int] = [] # target 탐색 순서
         self.patrol = SimpleNamespace( pose=None, status= RobotStatus.PATROL, )
         self.guardian = SimpleNamespace( pose=None, status=RobotStatus.STANDBY,)
 
+        self.patrol_client = self.create_client(SetBool, '/gundam/patrol_mode')
+
+        self._target_id_counter = 0
         self.command_thread = None
     
     def find_target_callback(self, request:FindTarget.Request, response:FindTarget.Response):
-        stamp = request.stamp
+        patrol_id = request.patrol_id
         targets:list[Target] = request.objects
 
         self.get_logger().info("Requested find target")
 
-        for target in targets:
-            object_id = target.object_id    
-            
-            if object_id not in self.targets:
-                self.target_order.append(object_id)
+        is_there_new_target = False
 
-            self.targets[object_id] = target
+        for target in targets:
+            is_new_target = True
+            pose = target.object_position.x, target.object_position.y
+            
+            for tracked_target in self.tracked_targets.values():
+                if tracked_target.is_same_object(pose):
+                    is_new_target = False
+                    break
+            
+            if is_new_target:
+                tracked_target = TrackedTarget(pose, patrol_id)
+                self.tracked_targets[tracked_target.id] = tracked_target
+                self.target_order.append(tracked_target.id)
+                is_there_new_target = True
         
-        self.run_command_thread()
+        if is_there_new_target:
+            self.get_logger().info("new object detected to track")
+
+            self.run_command_thread()
+            response.keep_track = True
+            response.message = "track the object"
+        else:
+            self.get_logger().info("already tracked object")
+
+            response.keep_track = False
+            response.message = "keep patrol"
 
         response.operation_successful = True
-        response.message = "successful"
+
         return response
             
     def run_command_thread(self):
@@ -103,15 +128,27 @@ class CentralNode(Node):
             self.get_logger().info(f"Result: success={result.success}, message='{result.message}'")
 
             if result.success:
-                del self.targets[target_id]
+                self.get_logger().info("delete the target")
+                del self.tracked_targets[target_id]
+
+                self.get_logger().info("command to patrol the patrol bot")
+                self.resume_patrol()
             else:
                 self.get_logger().warn(f"Failed to detect") # 실패할 경우 어떻게 할지 정해야함 target에 추가할 것인지 아닌지
 
-
-                
+    def resume_patrol(self):
+        request = SetBool.Request()
+        request.data = True
+        future = self.patrol_client.call_async(request)
+        future.add_done_callback(self.resume_patrol_callback)
     
+    def resume_patrol_callback(self,future):
+        response = future.result()
+        if response:
+            self.get_logger().info('turn on patrol mode')
+        else:
+            self.get_logger().info('patrol mode service failed')
 
-    
 def main(args=None):
     rclpy.init(args=args)
     node = CentralNode()
