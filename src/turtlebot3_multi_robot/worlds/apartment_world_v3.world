@@ -2730,10 +2730,26 @@
         <pose>-7.25399 3.9918 0.49999 -0 1e-06 3e-06</pose>
         <scale>1 1 1</scale>
         <link name='link'>
-          <pose>-7.25399 3.9918 0.49999 -0 1e-06 3e-06</pose>
+    	  <pose>-7.25399 3.9918 0.49999 -0 1e-06 3e-06</pose>
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>0 0 -9.8 0 -0 0</acceleration>
           <wrench>0 0 -9.8 0 -0 0</wrench>
+
+          <!-- Add visual element to display texture -->
+          <visual name='box_visual'>
+            <geometry>
+              <box>
+                <size>1 1 1</size>
+              </box>
+            </geometry>
+            <material>
+              <script>
+                <uri>file://materials/scripts</uri>
+                <uri>file://materials/textures</uri>
+                <name>Gazebo/CustomBoxTexture</name>
+              </script>
+            </material>
+          </visual>
         </link>
       </model>
       <model name='unit_box_clone'>
@@ -2744,6 +2760,21 @@
           <velocity>0 0 0 0 -0 0</velocity>
           <acceleration>6.80565 0.349196 6.8346 -0.69799 1.0449 0.000404</acceleration>
           <wrench>6.80565 0.349196 6.8346 0 -0 0</wrench>
+         <!-- Add visual element to display texture -->
+          <visual name='box_visual'>
+            <geometry>
+              <box>
+                <size>1 1 1</size>
+              </box>
+            </geometry>
+            <material>
+              <script>
+                <uri>file://materials/scripts</uri>
+                <uri>file://materials/textures</uri>
+                <name>Gazebo/CustomBoxTexture</name>
+              </script>
+            </material>
+          </visual>
         </link>
       </model>
       <model name='waffle_pi'>

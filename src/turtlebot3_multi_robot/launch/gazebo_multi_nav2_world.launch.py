@@ -166,7 +166,7 @@ def generate_launch_description():
             package='gazebo_ros',
             executable='spawn_entity.py',
             arguments=[
-                '-file', os.path.join(turtlebot3_multi_robot,'models', 'turtlebot3_' + TURTLEBOT3_MODEL, 'model.sdf'),
+                '-file', os.path.join(turtlebot3_multi_robot,'models', 'human_male_1', 'model.sdf'),
                 '-entity', robot['name'],
                 '-robot_namespace', namespace,
                 '-x', robot['x_pose'], '-y', robot['y_pose'],
