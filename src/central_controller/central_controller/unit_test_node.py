@@ -24,14 +24,14 @@ class UnitTest(Node):
 
         self.find_target_client = self.create_client(FindTarget, 'find_target',qos_profile=self.qos_profile)
         # self.find_target_service = self.create_service(FindTarget, 'find_target', callback=self.find_target_callback, qos_profile=self.qos_profile)
-        self.command_action_server = ActionServer(self, MoveTo, 'get_order', self.command_action_callback)
+        # self.command_action_server = ActionServer(self, MoveTo, 'get_order', self.command_action_callback)
 
 
         # 서비스가 준비될 때까지 대기
         while not self.find_target_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Service not available, waiting again...')
 
-        self.timer = self.create_timer(5.0, self.timer_callback)
+        self.timer = self.create_timer(10.0, self.timer_callback)
     
     def command_action_callback(self, goal_handle):
         self.get_logger().info("test node action init")
@@ -52,11 +52,11 @@ class UnitTest(Node):
         self.get_logger().info("Sending request to the server...")
 
         req = FindTarget.Request()
-        req.stamp = 0
+        req.patrol_id = 1
 
         point = Point()
-        point.x = 10.0
-        point.y = 20.0
+        point.x = 2.0
+        point.y = -1.0
         
         target = Target()
         target.object_id = 1

@@ -18,6 +18,7 @@ class Guard_node(Node):
 
     def __init__(self):
         super().__init__('guard_node')
+        self.get_logger().info("init guard node")
 
         self.vip = VIPManagementSystem()
 
@@ -41,12 +42,13 @@ class Guard_node(Node):
         # SM_tracked_image_pub
         self.sm_tracked_image_publisher = self.create_publisher(Image, '/tracked_image', 10)
         # patrol_AMR_pub
-        self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
+        # self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
 
         # get_order_sub
         self.get_order_subscriber = ActionServer(self, MoveTo, 'get_order', self.order_callback)
         # AMR_navgoal_action_client
-        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/ironman/navigate_to_pose') 
+        # self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/ironman/navigate_to_pose') 
+        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
 
     def euler_to_quaternion(self, roll, pitch, yaw):
         # Convert Euler angles to a quaternion
@@ -57,6 +59,7 @@ class Guard_node(Node):
         return Quaternion(x=qx, y=qy, z=qz, w=qw)
     
     def set_initial_pose(self, x, y, z, w):
+        self.get_logger().info("set initial pose")
         req = SetInitialPose.Request()
         req.pose.header.frame_id = 'map'
         req.pose.pose.pose.position = Point(x=x, y=y, z=0.0)
@@ -84,7 +87,7 @@ class Guard_node(Node):
             self.get_logger().error(f"[ERROR] Service call failed: {e}")
 
     # 디지털 맵 내 지정 구역으로 이동
-    def order_callback(self, goal_handle):
+    async def order_callback(self, goal_handle):
         request:MoveTo.Goal = goal_handle.request
 
         position = request.position
@@ -95,61 +98,50 @@ class Guard_node(Node):
             goal_msg.header.stamp = self.get_clock().now().to_msg()
             goal_msg.pose.position.x = position.x
             goal_msg.pose.position.y = position.y
-            goal_msg.pose.orientation = 1.0  # 회전 값 (회전 없음)
+            goal_msg.pose.orientation.w = 1.0  # 회전 값 (회전 없음)
 
             if not self.amr_navgoal_client.wait_for_server(timeout_sec=1.0):
                 self.get_logger().info('Action server not available')
                 return
             
+        # NavigateToPose 액션 실행
+        nav_result = await self.navigate_to_pose(goal_msg)
 
-            # 현재 amr 에 입력되어 있는 명령을 무시하도록 하는 코드 필요
+        # 결과 처리
+        if nav_result:
+            self.get_logger().info("Navigation succeeded.")
+            goal_handle.succeed()
+            return MoveTo.Result(success=True)
+        else:
+            self.get_logger().info("Navigation failed.")
+            goal_handle.abort()
+            return MoveTo.Result(success=False)
 
-            goal_pos = NavigateToPose.Goal()
-            goal_pos.pose = goal_msg
-            future = self.amr_navgoal_client.send_goal_async(goal_pos, feedback_callback=self.feedback_callback)
-
-            future.add_done_callback(self.goal_response_callback)
-
-            # annotated_frame, track_ids, class_names, boxes, confidences = self.detect_objects()
-            # if 'car' in class_names:
-            #     self.tracking(self.frame, self.results)
-            # else:
-            #     move_cmd = Twist()
-            #     radius = 5.0  # 원의 반지름
-            #     angular_speed = 0.2  # 회전 속도
-            #     linear_speed = angular_speed * radius  # 선형 속도
-
-            #     move_cmd.linear.x = linear_speed
-            #     move_cmd.angular.z = angular_speed
-
-            #     # 일정 시간 동안 원을 그림
-            #     rate = self.create_rate(10)
-            #     start_time = self.get_clock().now()
-            #     while (self.get_clock().now() - start_time) < Duration(seconds=2 * math.pi * radius / linear_speed):
-            #         if 'car' in class_names:
-            #             self.tracking(self.frame, self.results)
-            #         else:
-            #             self.amr_cmd_vel_pub.publish(move_cmd)
-            #             rate.sleep()
-
-            #     # 멈춤
-            #     move_cmd.linear.x = 0.0
-            #     move_cmd.angular.z = 0.0
-            #     self.amr_cmd_vel_pub.publish(move_cmd)
         
-    
-    def goal_response_callback(self, future):
-        result = future.result()
-        if result.status == GoalStatus.STATUS_SUCCEEDED:
-            # res1 = self.vip.SIFT_feature_matching(self.image)
-            res2 = MoveTo.Result()
-            res2.success = True
-            res2.message = '도착 완료'
-            return res2
-        
-    def feedback_callback(self, feedback):
-        # 네비게이션 피드백 처리 (필요시 사용)
-        self.get_logger().info(f"Feedback: {feedback}")
+    async def navigate_to_pose(self, target_pose):
+        """NavigateToPose 액션 클라이언트를 통해 목표로 이동."""
+        self.get_logger().info("Waiting for NavigateToPose Action Server...")
+        self.amr_navgoal_client.wait_for_server()
+
+        goal_msg = NavigateToPose.Goal()
+        goal_msg.pose = target_pose
+
+        self.get_logger().info(f"Sending navigation goal to {target_pose.pose.position.x}, {target_pose.pose.position.y}")
+        send_goal_future = self.amr_navgoal_client.send_goal_async(goal_msg)
+        goal_handle = await send_goal_future
+
+        if not goal_handle.accepted:
+            self.get_logger().info("Navigation goal rejected.")
+            return False
+
+        self.get_logger().info("Navigation goal accepted.")
+        get_result_future = goal_handle.get_result_async()
+        result = await get_result_future
+
+        if result.status == 4:  # STATUS_SUCCEEDED
+            return True
+        else:
+            return False    
     
     def convert_ros_to_cv2_image(self, ros_image):
         # ROS2 이미지를 OpenCV로 변환

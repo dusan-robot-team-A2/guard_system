@@ -7,14 +7,18 @@ from enum import Enum
 from types import SimpleNamespace
 import threading
 import asyncio
+import json
 
 from std_srvs.srv import SetBool
 from guard_interfaces.srv import FindTarget
 from guard_interfaces.msg import Target
 from guard_interfaces.action import MoveTo
 from geometry_msgs.msg import Point
+from std_msgs.msg import String
 
 from .tracked_target import TrackedTarget
+from .patrol import Patrol
+from .guard import Guard
 
 class RobotStatus(Enum):
     STANDBY = 0
@@ -34,21 +38,51 @@ class CentralNode(Node):
 
         self.get_logger().info("central node init")
 
-        self.find_target_service = self.create_service(FindTarget, 'find_target', callback=self.find_target_callback, qos_profile=self.qos_profile)
+        # self.find_target_service = self.create_service(FindTarget, 'find_target', callback=self.find_target_callback, qos_profile=self.qos_profile)
+        self.pub_system_info = self.create_publisher(String, 'system_info', 10)
         self.command_action = ActionClient(self, MoveTo, 'get_order')
 
         self.tracked_targets:dict[int,TrackedTarget] = {}
         self.target_order:list[int] = [] # target 탐색 순서
-        self.patrol = SimpleNamespace( pose=None, status= RobotStatus.PATROL, )
-        self.guardian = SimpleNamespace( pose=None, status=RobotStatus.STANDBY,)
+        self.patrols:dict[int,Patrol] = {}
+        self.guardian = Guard(namespace="ironman")
 
-        self.patrol_client = self.create_client(SetBool, '/gundam/patrol_mode')
+        self.init_patrol()
+
+        self.pub_system_info_timer = self.create_timer(1, self.pub_system_info_timer_callback)
 
         self._target_id_counter = 0
         self.command_thread = None
     
-    def find_target_callback(self, request:FindTarget.Request, response:FindTarget.Response):
-        patrol_id = request.patrol_id
+    def init_patrol(self):
+        patrol = Patrol(self, namespace="gundam")
+        self.patrols[patrol.patrol_id] = patrol
+    
+    def pub_system_info_timer_callback(self):
+        targets = []
+        for target_id in self.target_order:
+            target = self.tracked_targets[target_id]
+            targets.append({
+                "target_id":target.id,
+                "pose": target.pose,
+            })
+
+        data={
+            "patrols": [{ "patrol_id": patrol.patrol_id,
+                          "pose": patrol.pose,
+                          "status": patrol.status
+                          } for patrol in self.patrols.values()],
+            "guardian": {
+                "guard_id": self.guardian.guard_id,
+                "pose": self.guardian.pose,
+                "status": self.guardian.status
+            },
+            "targets":targets
+        }
+
+        self.pub_system_info.publish(json.dumps(data))
+    
+    def find_target_callback(self, patrol_id, request:FindTarget.Request, response:FindTarget.Response):
         targets:list[Target] = request.objects
 
         self.get_logger().info("Requested find target")
@@ -101,13 +135,9 @@ class CentralNode(Node):
         
     async def command_find(self):
         while self.target_order:
-            self.get_logger().info(str(self.target_order))
-            self.get_logger().info(str(self.tracked_targets))
             target_id = self.target_order.pop(0)
             target = self.tracked_targets[target_id]
 
-            # self.get_logger().info(f"command to go x:{target.object_position.x}, y:{target.object_position.y}")
-            # time.sleep(5)
             goal_msg = MoveTo.Goal()
             position = Point()
             position.x, position.y = target.pose
@@ -137,22 +167,12 @@ class CentralNode(Node):
                 del self.tracked_targets[target_id]
 
                 self.get_logger().info("command to patrol the patrol bot")
-                self.resume_patrol()
+
+                patrol_id = target.tracked_by
+                self.patrols[patrol_id].resume_patrol()
             else:
                 self.get_logger().warn(f"Failed to detect") # 실패할 경우 어떻게 할지 정해야함 target에 추가할 것인지 아닌지
-
-    def resume_patrol(self):
-        request = SetBool.Request()
-        request.data = True
-        future = self.patrol_client.call_async(request)
-        future.add_done_callback(self.resume_patrol_callback)
-    
-    def resume_patrol_callback(self,future):
-        response = future.result()
-        if response:
-            self.get_logger().info('turn on patrol mode')
-        else:
-            self.get_logger().info('patrol mode service failed')
+                # self.target_order.append(target_id)
 
 def main(args=None):
     rclpy.init(args=args)
