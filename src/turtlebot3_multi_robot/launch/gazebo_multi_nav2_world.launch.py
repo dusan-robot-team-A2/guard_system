@@ -41,12 +41,6 @@ def generate_launch_description():
         {'name': 'patrol', 'x_pose': '4.36', 'y_pose': '3.10', 'z_orientation':'0.9935519431264099', 'w_orientation': '0.11337784752646853'},
         {'name': 'guard', 'x_pose': '5.05', 'y_pose': '6.97', 'z_orientation':'-0.7747218547947281', 'w_orientation': '0.6323021806884871' },
     ]  
-        
-        #{'name': 'tb3', 'x_pose': '1.5', 'y_pose': '-0.5', 'z_pose': 0.01},
-        #{'name': 'tb4', 'x_pose': '1.5', 'y_pose': '0.5', 'z_pose': 0.01},
-        # ...
-        # ...
-
     covariance = [
             0.25, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.25, 0.0, 0.0, 0.0, 0.0,
@@ -180,7 +174,8 @@ def generate_launch_description():
             package='gazebo_ros',
             executable='spawn_entity.py',
             arguments=[
-                '-file', os.path.join(turtlebot3_multi_robot,'models', 'human_male_1', 'model.sdf'),
+                # '-file', os.path.join(turtlebot3_multi_robot,'models', 'human_male_1', 'model.sdf'),
+                '-file', os.path.join(turtlebot3_multi_robot,'models', 'turtlebot3_' + TURTLEBOT3_MODEL, 'model.sdf'),
                 '-entity', robot['name'],
                 '-robot_namespace', namespace,
                 '-x', robot['x_pose'], '-y', robot['y_pose'],
