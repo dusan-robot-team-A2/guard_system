@@ -22,21 +22,6 @@ class Guard_node(Node):
 
         self.vip = VIPManagementSystem()
 
-        self.num = 3
-        self.init_pose = [0.0, 0.0, 0.0, 1.0]
-        self.goal_poses = [[0.0, 0.0] for _ in range(self.num)]
-        self.setting_poses = [False for _ in range(self.num)]
-
-        # SetInitialPose 서비스 클라이언트 생성
-        self.set_initial_pose_service_client = self.create_client(
-            SetInitialPose,
-            '/set_initial_pose'
-        )
-
-        self.initial_status = False
-
-        self.set_initial_pose(*self.init_pose)
-
         # GUARD AMR_Image sub
         self.AMR_image_subscriber = self.create_subscription(Image,'/ironman/camera/image_raw',self.image_callback, 10)
         # SM_tracked_image_pub
@@ -49,43 +34,7 @@ class Guard_node(Node):
         # AMR_navgoal_action_client
         # self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/ironman/navigate_to_pose') 
         self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
-
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        # Convert Euler angles to a quaternion
-        qx = math.sin(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) - math.cos(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
-        qy = math.cos(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2)
-        qz = math.cos(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2) - math.sin(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2)
-        qw = math.cos(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
-        return Quaternion(x=qx, y=qy, z=qz, w=qw)
     
-    def set_initial_pose(self, x, y, z, w):
-        self.get_logger().info("set initial pose")
-        req = SetInitialPose.Request()
-        req.pose.header.frame_id = 'map'
-        req.pose.pose.pose.position = Point(x=x, y=y, z=0.0)
-        req.pose.pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=z, w=w)
-        req.pose.pose.covariance = [
-            0.1, 0.0, 0.0, 0.0, 0.0, 0.1,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.1, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.01
-        ]
-
-        future = self.set_initial_pose_service_client.call_async(req)
-        future.add_done_callback(self.handle_initial_pose_response)
-
-    def handle_initial_pose_response(self, future):
-        try:
-            response = future.result()
-            if response:
-                self.initial_status = True
-            else:
-                self.get_logger().warn("[WARN] Failed to set initial pose")
-        except Exception as e:
-            self.get_logger().error(f"[ERROR] Service call failed: {e}")
-
     # 디지털 맵 내 지정 구역으로 이동
     async def order_callback(self, goal_handle):
         request:MoveTo.Goal = goal_handle.request
