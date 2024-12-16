@@ -15,6 +15,7 @@
 # Authors: Arshad Mehmood
 
 import os
+import rclpy
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -26,19 +27,26 @@ from launch_ros.actions import Node
 from launch.event_handlers import OnProcessExit
 from launch.conditions import IfCondition
 import launch.logging
+import transforms3d.euler
 
 def generate_launch_description():
     ld = LaunchDescription()
 
     # Names and poses of the robots
     robots = [
-        {'name': 'patrol', 'x_pose': '4.0', 'y_pose': '-4.0', 'z_orientation':'0.7071054596842321', 'w_orientation': '0.7071081026863932', 'Yaw': '1.5708'},
-        {'name': 'guard', 'x_pose': '8.0', 'y_pose': '-4.0', 'z_orientation':'-0.999964111505885', 'w_orientation': '0.00847205407476365', 'Yaw': '3.1416' },
+        {'name': 'patrol', 'x_pose': '4.0', 'y_pose': '-4.0',  'Yaw': '1.5708'},
+        {'name': 'guard', 'x_pose': '8.0', 'y_pose': '-4.0','Yaw': '3.1416' },
+    ]
+    robots_initial = [
+        {'name': 'patrol', 'x_pose': '4.36', 'y_pose': '3.10', 'z_orientation':'0.9935519431264099', 'w_orientation': '0.11337784752646853'},
+        {'name': 'guard', 'x_pose': '5.05', 'y_pose': '6.97', 'z_orientation':'-0.7747218547947281', 'w_orientation': '0.6323021806884871' },
+    ]  
+        
         #{'name': 'tb3', 'x_pose': '1.5', 'y_pose': '-0.5', 'z_pose': 0.01},
         #{'name': 'tb4', 'x_pose': '1.5', 'y_pose': '0.5', 'z_pose': 0.01},
         # ...
         # ...
-        ]
+
     covariance = [
             0.25, 0.0, 0.0, 0.0, 0.0, 0.0,
             0.0, 0.25, 0.0, 0.0, 0.0, 0.0,
@@ -121,7 +129,8 @@ def generate_launch_description():
         executable='map_server',
         name='map_server',
         output='screen',
-        parameters=[{'yaml_filename': os.path.join(get_package_share_directory('turtlebot3_navigation2'), 'map', 'map4.yaml'),
+        parameters=[{'yaml_filename': os.path.join(get_package_share_directory('turtlebot3_navigation2'), 'map', 'map3.yaml'),
+
                      },],
         remappings=remappings)
 
@@ -148,6 +157,11 @@ def generate_launch_description():
     for robot in robots:
 
         namespace = [ '/' + robot['name'] ]
+
+        # q = [0, 0, robot['z_orientation'], robot['w_orientation']]
+        # euler = transforms3d.euler.quat2euler(q)
+        # print(f'Roll: {euler[0]}, Pitch: {euler[1]}, Yaw: {euler[2]}')
+        # yaw = euler[2]
         
         # Create state publisher node for that instance
         turtlebot_state_publisher = Node(
@@ -160,7 +174,7 @@ def generate_launch_description():
             remappings=remappings,
             arguments=[urdf],
         )
-
+            
         # Create spawn call
         spawn_turtlebot3_burger = Node(
             package='gazebo_ros',
@@ -219,7 +233,7 @@ def generate_launch_description():
 
     ######################
     # Start rviz nodes and drive nodes after the last robot is spawned
-    for robot in robots:
+    for robot in robots_initial:
 
         namespace = [ '/' + robot['name'] ]
 
