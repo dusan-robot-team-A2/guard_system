@@ -45,7 +45,7 @@ class CentralNode(Node):
         self.tracked_targets:dict[int,TrackedTarget] = {}
         self.target_order:list[int] = [] # target 탐색 순서
         self.patrols:dict[int,Patrol] = {}
-        self.guardian = Guard(namespace="ironman")
+        self.guardian = Guard(self, namespace="guard")
 
         self.init_patrol()
 
@@ -55,7 +55,7 @@ class CentralNode(Node):
         self.command_thread = None
     
     def init_patrol(self):
-        patrol = Patrol(self, namespace="gundam")
+        patrol = Patrol(self, namespace="patrol")
         self.patrols[patrol.patrol_id] = patrol
     
     def pub_system_info_timer_callback(self):
@@ -80,7 +80,10 @@ class CentralNode(Node):
             "targets":targets
         }
 
-        self.pub_system_info.publish(json.dumps(data))
+        data_msg = String()
+        data_msg.data = json.dumps(data)
+
+        self.pub_system_info.publish(data_msg)
     
     def find_target_callback(self, patrol_id, request:FindTarget.Request, response:FindTarget.Response):
         targets:list[Target] = request.objects

@@ -27,7 +27,6 @@ from launch_ros.actions import Node
 from launch.event_handlers import OnProcessExit
 from launch.conditions import IfCondition
 import launch.logging
-import transforms3d.euler
 
 def generate_launch_description():
     ld = LaunchDescription()

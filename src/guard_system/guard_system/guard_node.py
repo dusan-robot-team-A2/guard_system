@@ -23,17 +23,17 @@ class Guard_node(Node):
         self.vip = VIPManagementSystem()
 
         # GUARD AMR_Image sub
-        self.AMR_image_subscriber = self.create_subscription(Image,'/ironman/camera/image_raw',self.image_callback, 10)
+        # self.AMR_image_subscriber = self.create_subscription(Image,'/guard/camera/image_raw',self.image_callback, 10)
         # SM_tracked_image_pub
         self.sm_tracked_image_publisher = self.create_publisher(Image, '/tracked_image', 10)
         # patrol_AMR_pub
-        # self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
+        self.patrol_AMR_publisher = self.create_publisher(msg.String, '/found', 10)
 
         # get_order_sub
         self.get_order_subscriber = ActionServer(self, MoveTo, 'get_order', self.order_callback)
         # AMR_navgoal_action_client
-        # self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/ironman/navigate_to_pose') 
-        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
+        self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/guard/navigate_to_pose') 
+        # self.amr_navgoal_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
     
     # 디지털 맵 내 지정 구역으로 이동
     async def order_callback(self, goal_handle):

@@ -26,8 +26,8 @@ class ResidentRecognitionRobot(Node):
         self.get_logger().info(f"주민 인식 로봇 시작: {self.robot_name}")
 
         # 내비게이션 클라이언트
-        # self.nav_client = ActionClient(self, NavigateToPose, f'/{self.robot_name}/navigate_to_pose')
-        self.nav_client = ActionClient(self, NavigateToPose, f'/navigate_to_pose')
+        self.nav_client = ActionClient(self, NavigateToPose, f'/{self.robot_name}/navigate_to_pose')
+        # self.nav_client = ActionClient(self, NavigateToPose, f'/navigate_to_pose')
         self.nav_goal_handle = None
 
         # 카메라 이미지 구독
@@ -48,7 +48,7 @@ class ResidentRecognitionRobot(Node):
             depth=10
         )
 
-        self.call_security_client = self.create_client(FindTarget, 'find_target', qos_profile=self.qos_profile)
+        self.call_security_client = self.create_client(FindTarget, f'/{self.robot_name}/find_target', qos_profile=self.qos_profile)
         while not self.call_security_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn("관제탑 호출 서비스 대기 중...")
 
@@ -61,8 +61,8 @@ class ResidentRecognitionRobot(Node):
         # )
 
         self.create_service(SetBool, f'/{self.robot_name}/patrol_mode', self.patrol_mode_callback)
-        # self.cmd_vel_pub = self.create_publisher(Twist, '/{self.robot_name}/cmd_vel', 10)
-        self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.cmd_vel_pub = self.create_publisher(Twist, f'/{self.robot_name}/cmd_vel', 10)
+        # self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
         self.security_robot_called = False
 
@@ -70,21 +70,28 @@ class ResidentRecognitionRobot(Node):
 
         # 순찰 경로 설정
         self.patrol_points = [
-            (0.0, 0.0),
-            (1.0, -1.0),
-            (3.75, 0.77),
-            (1.6, 2.26)
+            (4.32, 3.13, 1, 0.1),
+            (0.47, 3.6, 0.98, 0.16),
+            (-4.92, 5.7, 0.83, 0.557),
+            (-1.71, 7.64, 0.34, 0.94),
+            (1.492, -1.80, -0.549, 0.835),
+            (-0.140, -5.669, -0.961, 0.274),
+            (-1.277, -1.320, 0.4022, 0.9155),
+            (0.290, 3.487, 0.328, 0.944)
         ]
         self.current_patrol_index = 0
         self.navigation_in_progress = False
         self.stopped_due_to_intruder = False
 
-        self.timer = self.create_timer(10, self.timer_callback)
+        self.timer = self.create_timer(55, self.timer_callback)
+        self.timer_once = True
 
         self.send_to_next_waypoint()
 
     def timer_callback(self):
-        self.stop_and_call_security_robot()
+        if self.timer_once:
+            self.stop_and_call_security_robot()
+            self.timer_once = False
     
     def patrol_mode_callback(self, request:SetBool.Request, response:SetBool.Response):
         # 요청이 들어오면 상태를 반전시킴
@@ -168,8 +175,8 @@ class ResidentRecognitionRobot(Node):
 
         request = FindTarget.Request()
         point = Point()
-        point.x = 100.0
-        point.y = 100.0
+        point.x = -5.680
+        point.y = 7.759
 
         target = Target()
         target.object_id = 1
@@ -229,7 +236,7 @@ class ResidentRecognitionRobot(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    robot_name = 'gundam'
+    robot_name = 'patrol'
     resident_robot = ResidentRecognitionRobot(robot_name)
 
     try:

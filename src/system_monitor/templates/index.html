@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <p>hi</p>
+    <div id="output"></div>
+    <form action="/end_emergency" method="POST">
+        <button type="submit">End Emergency</button>
+    </form>    
+    <script>
+        const eventSource = new EventSource('/data');
+
+        eventSource.onmessage = function(event) {
+            const jsonData = JSON.parse(event.data); // JSON 데이터 파싱
+            // document.getElementById('output').innerHTML = `
+            //     <p>Emergency Status: ${jsonData.emergency_status}</p>
+            //     <p>AMR Status: ${jsonData.amr_status}</p>
+            // `;
+            console.log(jsonData)
+        };
+
+        // 에러 처리
+        eventSource.onerror = function() {
+            console.error("Connection lost or an error occurred.");
+        };
+    </script>
+</body>
+</html>
